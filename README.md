@@ -89,6 +89,14 @@ pnpm check
 - 兼容减少动态效果偏好的动画；离屏或隐藏标签页时暂停绘图。
 - GitHub Pages 自动发布工作流与本地链接检查。
 
+## 随记
+
+随记目录位于 `/zh/notes/journal/`。每篇文章独立保存在 `content/journal/<slug>.md`，标题、日期范围与原文顺序保存在 `content/journal/index.json`。新增文章时同时更新这两个位置；`sections` 数组与文章的二级标题保持一致。目录搜索标题、小节与日期，文章不提供搜索框。
+
+Word 图片已转换为 WebP，图片组和图注写在文章 Markdown 的 HTML 块中。为便于批量上传，图片数据按组存放在 `content/journal/images/*.json.gz`；构建脚本使用 Node 内置 gzip 解压，在 `dist/journal/` 生成独立图片。构建不依赖原始 Word，也不需要额外解压软件。此目录里的压缩图片包属于必需的源文件，发布时需要包含。
+
+界面支持中英切换，随记正文保留中文原文，不自动生成译文。“足迹：昆明”的日期已按作者确认修正为 2025 年。
+
 ## 依赖
 
 Markdown 渲染：markdown-it；公式：KaTeX 与 markdown-it-texmath；元信息解析：yaml。依赖版本记录于 `pnpm-lock.yaml`。三维雕塑以词语的确定性哈希生成参数，在 Canvas 中进行透视投影；相同词语、形态和形变值会产生相同几何结构。
