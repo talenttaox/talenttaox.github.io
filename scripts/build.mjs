@@ -28,17 +28,44 @@ for (const entry of await fs.readdir(path.join(root, 'content/notes'), {withFile
     if (!data.title || !data.description || !/^\d{4}-\d{2}-\d{2}$/.test(String(data.date)) || !Array.isArray(data.tags)) throw new Error(`Invalid metadata: ${source}`);
     if (data.pdf && (!/^\/lectures\/[a-zA-Z0-9_./-]+\.pdf$/.test(data.pdf) || data.pdf.includes('..'))) throw new Error(`Invalid PDF path: ${source}`);
     if (data.pdf) await fs.access(path.join(root, 'public', data.pdf));
-    const tokens = md.parse(match[2], {});
-    const headings = []; let n=0;
+    let body = match[2];
+    const chapterTitles = new Map();
+    let chapterCount = 0;
+    if (data.chapters === true) {
+      const chapterDir = path.join(root, 'content/notes', slug, 'chapters');
+      const files = (await fs.readdir(chapterDir)).filter(f=>/^\d{2}-.+\.md$/.test(f)).sort();
+      if (!files.length) throw new Error(`No chapters: ${source}`);
+      const chapterLinks = new Map(files.map(f=>[f, f.startsWith('00-')?'overview':`chapter-${f.slice(0,2)}`]));
+      for (const file of files) {
+        const content = await fs.readFile(path.join(chapterDir,file),'utf8');
+        const title = content.match(/^# (.+)$/m)?.[1];
+        if (!title) throw new Error(`Missing chapter title: ${file}`);
+        const id = chapterLinks.get(file);
+        chapterTitles.set(title,id);
+        if (id !== 'overview') chapterCount++;
+        const transformed = content.replace(/^(#{1,5}) /gm,'#$1 ').replace(/\]\(([^)]+\.md)\)/g,(link,target)=>chapterLinks.has(target)?`](#${chapterLinks.get(target)})`:link);
+        body += '\n\n'+transformed;
+      }
+    }
+    // Chinese punctuation before a bold delimiter needs a following boundary.
+    const renderBody=body.replace(/\*\*([^*\n]+[：:])\*\*(?=\S)/g,'**$1** ');
+    const tokens = md.parse(renderBody, {});
+    const headings = []; let n=0, chapterId='', chapterSection=0;
     for (let i=0;i<tokens.length;i++) {
       if (tokens[i].type === 'heading_open') {
-        const id=`section-${++n}`; tokens[i].attrSet('id', id);
+        let id=`section-${++n}`;
+        if (chapterTitles.has(tokens[i+1].content)) {
+          id=chapterTitles.get(tokens[i+1].content); chapterId=id; chapterSection=0;
+        } else if (chapterId) id=`${chapterId}-section-${++chapterSection}`;
+        tokens[i].attrSet('id', id); tokens[i].attrSet('tabindex','-1');
+        if (chapterTitles.has(tokens[i+1].content)) tokens[i].attrSet('class','chapter-heading');
         headings.push({id,text:tokens[i+1].content,level:tokens[i].tag});
       }
     }
     const html = md.renderer.render(tokens,md.options,{});
-    const count = lang === 'zh' ? (match[2].match(/[\u3400-\u9fff]/g)||[]).length : match[2].split(/\s+/).length;
-    notes.push({...data,slug,lang,raw,body:match[2],html,headings,minutes:Math.max(1,Math.ceil(count/(lang==='zh'?350:200))),url:`/${lang}/notes/${slug}/`});
+    const contentLang = data.contentLang || lang;
+    const count = contentLang === 'zh' ? (body.match(/[\u3400-\u9fff]/g)||[]).length : body.split(/\s+/).length;
+    notes.push({...data,slug,lang,raw:match[0].slice(0,match[0].length-match[2].length)+body,body,html,headings,chapterCount,minutes:Math.max(1,Math.ceil(count/(contentLang==='zh'?350:200))),url:`/${lang}/notes/${slug}/`});
   }
 }
 notes.sort((a,b)=>String(b.date).localeCompare(String(a.date)) || a.slug.localeCompare(b.slug));
@@ -51,14 +78,23 @@ await fs.cp(path.join(root,'node_modules/katex/dist'),path.join(dist,'assets/kat
 const put=async(p,content)=>{const dest=path.join(dist,p); await fs.mkdir(path.dirname(dest),{recursive:true});await fs.writeFile(dest,content);};
 const arrow='<span aria-hidden="true">↗</span>';
 const languagePath=(lang,route)=>`/${lang}/${route ? route+'/' : ''}`;
+function renderToc(note,lang) {
+  const groups=[];
+  for(const heading of note.headings.filter(h=>h.level==='h2'||h.level==='h3')) {
+    if(heading.level==='h2'||!groups.length) groups.push({...heading,children:[]});
+    else groups.at(-1).children.push(heading);
+  }
+  const link=h=>`<a href="#${h.id}">${esc(h.text)}</a>`;
+  return `<details class="toc-panel" open><summary class="toc-title">${site.languages[lang].toc}<span class="mono">${note.chapterCount?`${note.chapterCount} ${lang==='zh'?'章':'chapters'}`:''}</span></summary><nav class="toc-scroll" aria-label="${lang==='zh'?'章节与小节':'Chapters and sections'}">${groups.map(group=>group.children.length?`<details class="toc-group"><summary>${link(group)}</summary><div class="toc-sections">${group.children.map(link).join('')}</div></details>`:link(group)).join('')}</nav></details>`;
+}
 function layout(lang,route,body,opts={}) {
   const t=site.languages[lang], other=lang==='zh'?'en':'zh';
   const routes=['','notes','archive','about'];
   const current=languagePath(lang,route), counterpart=opts.counterpart ?? languagePath(other,route);
   const title=opts.title ? `${opts.title} · talenttao` : t.title;
-  return `<!doctype html><html lang="${t.lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title><meta name="description" content="${esc(opts.description||t.description)}"><meta name="color-scheme" content="light dark"><link rel="icon" href="/assets/favicon.svg" type="image/svg+xml"><link rel="canonical" href="${site.origin+current}"><link rel="alternate" hreflang="${t.lang}" href="${site.origin+current}">${opts.missing?'':`<link rel="alternate" hreflang="${site.languages[other].lang}" href="${site.origin+counterpart}">`}<meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(opts.description||t.description)}"><meta property="og:type" content="${opts.article?'article':'website'}"><meta property="og:url" content="${site.origin+current}"><meta property="og:image" content="${site.origin}/assets/social.svg"><link rel="alternate" type="application/rss+xml" title="${esc(t.rss)}" href="/${lang}/feed.xml"><link rel="stylesheet" href="/assets/style.css"><link rel="stylesheet" href="/assets/sculpture.css">${opts.article?'<link rel="stylesheet" href="/assets/katex/katex.min.css">':''}<script>try{document.documentElement.dataset.theme=localStorage.getItem('talenttao-theme')||'light'}catch{}</script><script src="/assets/app.js" defer></script></head><body data-lang="${lang}"><a class="skip" href="#main">${t.skip}</a><header class="header"><a class="brand" href="/${lang}/" aria-label="talenttao"><span class="brand-mark" aria-hidden="true">✳</span>talenttao<span class="brand-dot">.</span></a><button class="menu-toggle" aria-label="${t.menu}" aria-expanded="false" aria-controls="navigation">☰</button><nav id="navigation" aria-label="${lang==='zh'?'主导航':'Main navigation'}">${routes.map((r,i)=>`<a href="${languagePath(lang,r)}" ${route.split('/')[0]===r?'aria-current="page"':''}>${t.nav[i]}</a>`).join('')}</nav><div class="header-tools"><a class="language" href="${counterpart}" lang="${other}" aria-label="${t.language}" ${opts.missing?`title="${t.translationMissing}"`:''}>${other==='en'?'EN':'中文'} <span aria-hidden="true">↗</span></a><span class="tool-divider"></span><button class="theme-toggle" aria-label="${t.theme}" title="${t.theme}"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="7"/><path d="M12 5a7 7 0 0 1 0 14Z" fill="currentColor"/></svg></button></div></header><main id="main">${body}</main><footer class="footer"><a class="brand" href="/${lang}/">talenttao.</a><p>${t.footer}</p><div><a href="${site.github}" target="_blank" rel="noopener noreferrer">GitHub ${arrow}</a><a href="/${lang}/feed.xml">RSS ${arrow}</a><span>© 2026</span></div></footer></body></html>`;
+  return `<!doctype html><html lang="${t.lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title><meta name="description" content="${esc(opts.description||t.description)}"><meta name="color-scheme" content="light dark"><link rel="icon" href="/assets/favicon.svg" type="image/svg+xml"><link rel="canonical" href="${site.origin+current}"><link rel="alternate" hreflang="${t.lang}" href="${site.origin+current}">${opts.missing?'':`<link rel="alternate" hreflang="${site.languages[other].lang}" href="${site.origin+counterpart}">`}<meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(opts.description||t.description)}"><meta property="og:type" content="${opts.article?'article':'website'}"><meta property="og:url" content="${site.origin+current}"><meta property="og:image" content="${site.origin}/assets/social.svg"><link rel="alternate" type="application/rss+xml" title="${esc(t.rss)}" href="/${lang}/feed.xml"><link rel="stylesheet" href="/assets/style.css"><link rel="stylesheet" href="/assets/sculpture.css"><link rel="stylesheet" href="/assets/lectures.css">${opts.article?'<link rel="stylesheet" href="/assets/katex/katex.min.css">':''}<script>try{document.documentElement.dataset.theme=localStorage.getItem('talenttao-theme')||'light'}catch{}</script><script src="/assets/app.js" defer></script><script src="/assets/lectures.js" defer></script></head><body data-lang="${lang}"><a class="skip" href="#main">${t.skip}</a><header class="header"><a class="brand" href="/${lang}/" aria-label="talenttao"><span class="brand-mark" aria-hidden="true">✳</span>talenttao<span class="brand-dot">.</span></a><button class="menu-toggle" aria-label="${t.menu}" aria-expanded="false" aria-controls="navigation">☰</button><nav id="navigation" aria-label="${lang==='zh'?'主导航':'Main navigation'}">${routes.map((r,i)=>`<a href="${languagePath(lang,r)}" ${route.split('/')[0]===r?'aria-current="page"':''}>${t.nav[i]}</a>`).join('')}</nav><div class="header-tools"><a class="language" href="${counterpart}" lang="${other}" aria-label="${t.language}" ${opts.missing?`title="${t.translationMissing}"`:''}>${other==='en'?'EN':'中文'} <span aria-hidden="true">↗</span></a><span class="tool-divider"></span><button class="theme-toggle" aria-label="${t.theme}" title="${t.theme}"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="7"/><path d="M12 5a7 7 0 0 1 0 14Z" fill="currentColor"/></svg></button></div></header><main id="main">${body}</main><footer class="footer"><a class="brand" href="/${lang}/">talenttao.</a><p>${t.footer}</p><div><a href="${site.github}" target="_blank" rel="noopener noreferrer">GitHub ${arrow}</a><a href="/${lang}/feed.xml">RSS ${arrow}</a><span>© 2026</span></div></footer></body></html>`;
 }
-function rows(lang,list) {const t=site.languages[lang];return list.map((note,i)=>`<a class="note-row" href="${note.url}" data-note data-search="${esc((note.title+' '+note.description+' '+note.tags.join(' ')).toLocaleLowerCase())}" data-tags="${esc(JSON.stringify(note.tags))}"><span class="note-number">${String(i+1).padStart(2,'0')}</span><div class="note-copy"><div class="note-meta"><time datetime="${note.date}">${note.date.replaceAll('-','.')}</time>${note.demo?`<span class="demo-badge">${t.demo}</span>`:''}</div><h3>${esc(note.title)}</h3><p>${esc(note.description)}</p><div class="note-tags">${note.tags.map(tag=>`<span>${esc(tag)}</span>`).join('')}</div></div><span class="note-read">${note.minutes} ${t.minutes}<span class="row-arrow" aria-hidden="true">↗</span></span></a>`).join('');}
+function rows(lang,list) {const t=site.languages[lang];return list.map((note,i)=>`<a class="note-row" href="${note.url}" data-note data-search="${esc((note.title+' '+note.description+' '+note.tags.join(' ')).toLocaleLowerCase())}" data-tags="${esc(JSON.stringify(note.tags))}"><span class="note-number">${String(i+1).padStart(2,'0')}</span><div class="note-copy"><div class="note-meta"><time datetime="${note.date}">${note.date.replaceAll('-','.')}</time>${note.demo?`<span class="demo-badge">${t.demo}</span>`:''}</div><h3>${esc(note.title)}</h3><p>${esc(note.description)}</p><div class="note-tags">${note.tags.map(tag=>`<span>${esc(tag)}</span>`).join('')}</div></div><span class="note-read">${note.chapterCount ? `${note.chapterCount} ${lang==='zh'?'章':'chapters'}` : `${note.minutes} ${t.minutes}`}<span class="row-arrow" aria-hidden="true">↗</span></span></a>`).join('');}
 function field(lang){const t=site.languages[lang];return `<div class="sculpture-panel"><div class="sculpture-top mono"><span>FORM / <span id="form-id">001</span></span><span>GENERATIVE OBJECT</span></div><div class="sculpture-stage"><canvas id="sculpture" tabindex="0" role="img" aria-label="${t.fieldLabel}">${t.fieldFallback}</canvas><div class="sculpture-corner mono">X / Y / Z</div><div class="sculpture-hint">${t.fieldHint}</div></div><div class="sculpture-bottom"><div class="sculpture-heading"><h2>${t.fieldTitle}</h2><button id="save-form" aria-label="${t.save}" title="${t.save}">↓ PNG</button></div><form id="seed-form"><label class="sr-only" for="seed-word">${t.seedLabel}</label><input id="seed-word" value="talenttao" maxlength="48" placeholder="${t.seedPlaceholder}" autocomplete="off" spellcheck="false"><button type="submit">${t.generate} ↗</button></form><div class="sculpture-controls"><div class="form-tabs" role="group" aria-label="${lang==='zh'?'形态':'Form'}">${t.formNames.map((name,i)=>`<button type="button" data-form="${i}" aria-pressed="${i===0}">${name}</button>`).join('')}</div><label for="morph">${t.morph}</label><input id="morph" type="range" min="0" max="100" value="35"><button id="pause" aria-label="${t.pause}" aria-pressed="false">Ⅱ</button><button id="reset" aria-label="${t.reset}" title="${t.reset}">↺</button></div><span id="form-message" role="status" class="sr-only"></span></div></div>`;}
 const generated=[];
 for(const lang of langs){
@@ -71,8 +107,8 @@ for(const lang of langs){
   for(const [route,body] of [['',home],['notes',notePage],['archive',archive],['about',about]]){const url=languagePath(lang,route);await put(url+'index.html',layout(lang,route,body));generated.push(url);}
   for(const note of list){
     const counterpart=notes.find(n=>n.slug===note.slug && n.lang!==lang);
-    const toc=note.headings.filter(h=>h.level==='h2'||h.level==='h3').map(h=>`<a class="${h.level}" href="#${h.id}">${esc(h.text)}</a>`).join('');
-    const body=`<section class="shell article-head"><a class="text-link back" href="/${lang}/notes/">← ${t.backNotes}</a><div class="note-meta"><time datetime="${note.date}">${note.date.replaceAll('-','.')}</time><span>${note.minutes} ${t.minutes}</span>${note.demo?`<span class="demo-badge">${t.demo}</span>`:''}</div><h1>${esc(note.title)}</h1><p>${esc(note.description)}</p><div class="note-tags">${note.tags.map(tag=>`<span>${esc(tag)}</span>`).join('')}</div></section><div class="shell article-layout"><article class="prose">${note.demo?`<aside class="demo-notice">${t.demoNotice}</aside>`:''}${note.html}<div class="article-download"><a href="${note.url}${lang}.md" download>${t.download} ↓</a>${note.pdf?`<a href="${esc(note.pdf)}" download>${t.pdf} ↓</a>`:''}</div></article><aside class="toc"><h2>${t.toc}</h2>${toc}${counterpart?'':`<p class="missing-translation">${t.translationMissing}</p>`}</aside></div>`;
+    const toc=renderToc(note,lang);
+    const body=`<section class="shell article-head"><a class="text-link back" href="/${lang}/notes/">← ${t.backNotes}</a><div class="note-meta"><time datetime="${note.date}">${note.date.replaceAll('-','.')}</time><span>${note.minutes} ${t.minutes}</span>${note.demo?`<span class="demo-badge">${t.demo}</span>`:''}</div><h1>${esc(note.title)}</h1><p>${esc(note.description)}</p><div class="note-tags">${note.tags.map(tag=>`<span>${esc(tag)}</span>`).join('')}</div></section><div class="shell article-layout"><article class="prose"${note.contentLang==='zh'?' lang="zh-CN"':''}>${note.demo?`<aside class="demo-notice">${t.demoNotice}</aside>`:''}${note.contentLang && note.contentLang!==lang?`<p class="language-notice">${lang==='en'?'These lecture notes are in Chinese. An English translation is not available yet.':'讲义正文为英文。'}</p>`:''}${note.html}<div class="article-download"><a href="${note.url}${lang}.md" download>${t.download} ↓</a>${note.pdf?`<a href="${esc(note.pdf)}" download>${t.pdf} ↓</a>`:''}</div></article><aside class="toc">${toc}${counterpart?'':`<p class="missing-translation">${t.translationMissing}</p>`}</aside></div>`;
     await put(note.url+'index.html',layout(lang,`notes/${note.slug}`,body,{title:note.title,description:note.description,article:true,counterpart:counterpart?.url||`/${lang==='zh'?'en':'zh'}/notes/`,missing:!counterpart}));
     await put(note.url+`${lang}.md`,note.raw);generated.push(note.url);
   }

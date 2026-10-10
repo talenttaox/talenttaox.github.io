@@ -1,6 +1,6 @@
 # talenttao
 
-灰色系、可切换中英文的个人网站。公开页面保持简洁，只包含主页、笔记、归档和关于。目标网址：`https://talenttaox.github.io`。当前未发布任何笔记。
+灰色系、可切换中英文的个人网站。公开页面保持简洁，只包含主页、笔记、归档和关于。网址：`https://talenttaox.github.io`。已发布普通心理学讲义（16章）。
 
 ## 日常写作
 
@@ -36,6 +36,14 @@ draft: false
 设置 `draft: true` 可从生成网页、搜索和 RSS 中排除文章；公开 GitHub 仓库仍会公开源文件，私人草稿请保存在仓库之外。删除对应文件夹内的一个语言文件，只会移除该语言版本。
 
 ## 修改主页和个人资料
+
+### 更新普通心理学讲义
+
+`content/notes/general-psychology/chapters/` 保存原始讲义：`00-讲义目录.md` 为总览，`01-…md` 到 `16-…md` 为各章。直接用 Markdown 编辑器修改对应章节并提交即可。各章保持 `#` 章标题、`##` 小节标题的层级。
+
+`zh.md` 和 `en.md` 管理笔记条目的标题、摘要和标签。`chapters: true` 会自动组合该目录里的讲义，并生成可以折叠的章节与小节目录。`contentLang: zh` 声明正文为中文；英文界面会显示中文正文及译文未提供提示。讲义在笔记列表中始终是一个条目。
+
+章节使用固定锚点 `#chapter-01`、`#chapter-02` 等；总览中指向 Markdown 文件的链接会转换为对应章节的网页锚点。
 
 `content/site.json` 中的 `languages.zh` 和 `languages.en` 分别管理两种语言的文案。可修改主页短句和关于我；`github` 管理 GitHub 链接，`origin` 管理网站的最终网址。
 
