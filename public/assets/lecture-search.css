@@ -1,0 +1,23 @@
+.lecture-search{margin-bottom:36px}
+.lecture-search-form{border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:20px 0}
+.lecture-search-form>label{display:block;font-size:12px;color:var(--muted);margin-bottom:12px}
+.lecture-search-input{display:flex;background:var(--card);border:1px solid var(--line);align-items:center}
+.lecture-search-input input{width:100%;min-width:0;background:transparent;border:0;color:var(--ink);padding:15px 16px;font-size:14px;outline-offset:-3px}
+.lecture-search-input input::placeholder{color:var(--muted)}
+.lecture-search-input button{font-size:11px;color:var(--muted);padding:12px 16px;white-space:nowrap}
+.lecture-search-tools{display:flex;align-items:center;gap:8px;margin-top:12px}
+.lecture-search-tools output{margin-right:auto;font-size:11px;color:var(--muted);line-height:1.8}
+.lecture-search-tools button{border:1px solid var(--line);width:32px;height:30px;background:var(--card)}
+.lecture-search-tools button:disabled{opacity:.35;cursor:default}
+.lecture-result-list{max-height:360px;overflow-y:auto;overscroll-behavior:contain;border-bottom:1px solid var(--line);scrollbar-width:thin}
+.lecture-result{display:block;text-align:left;width:100%;padding:16px 18px;border-bottom:1px solid var(--line);background:var(--card);line-height:1.8}
+.lecture-result:last-child{border-bottom:0}
+.lecture-result:hover,.lecture-result[aria-current="true"]{background:var(--surface)}
+.lecture-result strong{display:block;font-size:11px;color:var(--muted);font-weight:400;margin-bottom:6px}
+.lecture-result span{font-size:13px;color:var(--ink);overflow-wrap:anywhere}
+.lecture-search mark,.prose mark.lecture-hit{background:var(--surface);color:var(--ink);border-bottom:2px solid var(--muted);padding:1px 0}
+.prose mark.lecture-hit.current{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.prose mark.lecture-hit{scroll-margin-top:100px}
+#lecture-more{font-size:12px;border:1px solid var(--line);padding:10px 18px;margin-top:12px}
+@media(max-width:760px){.lecture-search{margin-bottom:26px}.lecture-result-list{max-height:40dvh}.lecture-result{padding:14px}.lecture-search-input input{font-size:16px}.lecture-search-input button{padding:12px}.lecture-search-tools output{font-size:10px}}
+@media print{.lecture-search{display:none}.prose mark.lecture-hit,.prose mark.lecture-hit.current{background:transparent;color:inherit;border:0}}
