@@ -11,7 +11,8 @@
         "首页",
         "笔记",
         "归档",
-        "关于"
+        "关于",
+        "足迹"
       ],
       "skip": "跳到正文",
       "theme": "切换明暗主题",
@@ -82,7 +83,8 @@
         "Home",
         "Notes",
         "Archive",
-        "About"
+        "About",
+        "Footprints"
       ],
       "skip": "Skip to content",
       "theme": "Toggle light and dark theme",
