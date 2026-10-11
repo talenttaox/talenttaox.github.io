@@ -66,16 +66,17 @@ async function initialize() {
     if (zoom < 4) return;
     counties.replaceChildren(); countyLabels.replaceChildren();
     const boxes = [];
+    const screenScale = 1 / svg.getScreenCTM().a;
     for (const p of base.counties.filter(p => intersects(p.bbox, viewportBounds()))) {
       for (const f of cache.get(p.code) || []) {
         if (!intersects(f.bbox, viewportBounds())) continue;
         el('path', {d: f.path, class: 'travel-county-boundary'}, counties);
         if (zoom >= 8 && f.center) {
-          const [x, y] = project(f.center), width = f.name.length * 10 / zoom;
+          const [x, y] = project(f.center), width = f.name.length * 10 * screenScale;
           // Keep labels away from footprint points and previously placed labels.
-          const box = [x - width / 2, y - 10 / zoom, x + width / 2, y + 3 / zoom];
-          if ([...dots.values()].some(d => d.g.style.display !== 'none' && Math.abs(d.x - x) < (width / 2 + 50 / zoom) && Math.abs(d.y - y) < 18 / zoom) || boxes.some(b => intersects(b, box))) continue;
-          boxes.push(box); const label = el('text', {x, y, 'text-anchor': 'middle', 'font-size': 10 / zoom, 'stroke-width': 2 / zoom, class: 'travel-county-label'}, countyLabels); label.textContent = f.name;
+          const box = [x - width / 2, y - 10 * screenScale, x + width / 2, y + 3 * screenScale];
+          if ([...dots.values()].some(d => d.g.style.display !== 'none' && Math.abs(d.x - x) < (width / 2 + 50 * screenScale) && Math.abs(d.y - y) < 18 * screenScale) || boxes.some(b => intersects(b, box))) continue;
+          boxes.push(box); const label = el('text', {x, y, 'text-anchor': 'middle', 'font-size': 10 * screenScale, 'stroke-width': 1.3 * screenScale, class: 'travel-county-label'}, countyLabels); label.textContent = f.name;
         }
       }
     }
@@ -93,11 +94,11 @@ async function initialize() {
   function updateLabels() {
     const boxes = [], ordered = [...dots].sort((a, b) => Number(b[0] === selectedPlace) - Number(a[0] === selectedPlace) || counts.get(b[0]) - counts.get(a[0]));
     for (const [id, d] of ordered) {
-      const screenScale = Math.max(.6, 1000 / svg.getBoundingClientRect().width) / zoom;
+      const screenScale = 1 / svg.getScreenCTM().a;
       d.g.querySelector('circle:not(.travel-dot-hit)').setAttribute('r', (id === selectedPlace ? 4.5 : 3) * screenScale);
       d.g.querySelector('.travel-dot-hit').setAttribute('r', 13 * screenScale);
       d.label.setAttribute('x', 7 * screenScale); d.label.setAttribute('y', 4 * screenScale);
-      d.label.setAttribute('font-size', 11 * screenScale); d.label.setAttribute('stroke-width', 3 * screenScale);
+      d.label.setAttribute('font-size', 11 * screenScale); d.label.setAttribute('stroke-width', 1.5 * screenScale);
       const box = [d.x + 7 * screenScale, d.y - 8 * screenScale, d.x + (7 + places.get(id).name.length * 11) * screenScale, d.y + 6 * screenScale];
       const visible = d.g.style.display !== 'none' && d.x >= view.x && d.x <= view.x + view.width && d.y >= view.y && d.y <= view.y + view.height;
       const show = visible && !boxes.some(b => intersects(b, box));
