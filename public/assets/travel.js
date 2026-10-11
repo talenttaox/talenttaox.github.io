@@ -35,7 +35,7 @@ async function initialize() {
     const title = el('title', {}, g); title.textContent = p.fullName;
     const label = el('text', {}, g); label.textContent = p.name;
     dots.set(p.id, {g, label, x, y});
-    const select = () => { if (dragged) return; stop(); playStep = null; setMode('network'); shown = 12; delete $('travel-query-message').dataset.error; $('travel-place').value = p.name; selectedPlace = p.id; activeRow = null; query = p.name; draw(); };
+    const select = () => { if (dragged) return; if (selectedPlace === p.id) { restoreAll(); return; } stop(); playStep = null; setMode('network'); shown = 12; delete $('travel-query-message').dataset.error; $('travel-place').value = p.name; selectedPlace = p.id; activeRow = null; query = p.name; draw(); };
     g.addEventListener('click', select);
     g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(); } });
   }
@@ -116,6 +116,11 @@ async function initialize() {
     return {first: year ? Math.max(data.first, dayNumber(`${year}-01-01`)) : data.first, last: year ? Math.min(data.last, dayNumber(`${year}-12-31`)) : data.last};
   }
   function stop() { clearInterval(timer); timer = null; $('travel-play').textContent = `▶ ${t('播放', 'Play')}`; $('travel-play').setAttribute('aria-label', t('播放时间轴', 'Play timeline')); }
+  function restoreAll() {
+    stop(); $('travel-search').reset(); $('travel-year').value = ''; year = ''; query = ''; from = data.first; to = data.last;
+    selectedPlace = null; activeRow = null; shown = 12; playStep = null; cutoff = data.last;
+    delete $('travel-query-message').dataset.error; setMode('network'); draw();
+  }
   function setMode(value) { mode = value; $('travel-network').setAttribute('aria-pressed', String(mode === 'network')); $('travel-follow').setAttribute('aria-pressed', String(mode === 'follow')); }
   function dateRange(start, end) { return start === end ? dayString(start) : `${dayString(start)} — ${dayString(end)}`; }
   function kind(p) { return p.kind === 'urban' ? t('城区', 'Urban area') : p.kind === 'town' ? t('乡镇地点', 'Town') : p.officialName.endsWith('区') ? t('市辖区／行政区', 'District') : p.officialName.endsWith('市') ? t('县级市', 'County-level city') : t('县', 'County'); }
@@ -145,6 +150,7 @@ async function initialize() {
     if (!$('travel-query-message').dataset.error) $('travel-query-message').textContent = records.length ? '' : t('没有匹配的记录，试试其他地点或日期。', 'No matching records. Try another place or date.');
   }
   function draw() {
+    $('travel-restore').hidden = !(query || from !== data.first || to !== data.last || year || selectedPlace !== null || activeRow !== null || mode !== 'network');
     const b = bounds(), limit = mode === 'network' ? b.last : cutoff;
     slider.min = b.first; slider.max = b.last; slider.value = limit; slider.setAttribute('aria-valuetext', dayString(limit));
     $('travel-date').textContent = mode === 'network' ? t('全部轨迹', 'All journeys') : dayString(limit);
@@ -188,7 +194,9 @@ async function initialize() {
   $('travel-year').addEventListener('change', () => { stop(); year = $('travel-year').value; cutoff = bounds().last; activeRow = null; shown = 12; playStep = null; draw(); });
   $('travel-network').addEventListener('click', () => { stop(); activeRow = null; playStep = null; setMode('network'); draw(); });
   $('travel-follow').addEventListener('click', () => { setMode('follow'); draw(); });
-  $('travel-all').addEventListener('click', () => { stop(); cutoff = bounds().last; activeRow = null; playStep = null; setMode('network'); draw(); });
+  $('travel-all').addEventListener('click', restoreAll);
+  $('travel-restore').addEventListener('click', restoreAll);
+  svg.addEventListener('click', e => { if (!dragged && !e.target.closest('.travel-dot')) restoreAll(); });
   slider.addEventListener('input', () => { stop(); activeRow = null; playStep = null; cutoff = Number(slider.value); setMode('follow'); draw(); });
   $('travel-play').addEventListener('click', () => {
     if (timer) { stop(); return; }
@@ -220,6 +228,7 @@ async function initialize() {
   const release = e => { pointers.delete(e.pointerId); pinch = null; if (!pointers.size) { svg.classList.remove('is-dragging'); setTimeout(() => { dragged = false; }, 0); } };
   window.addEventListener('pointerup', release); window.addEventListener('pointercancel', release);
   svg.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { e.preventDefault(); restoreAll(); return; }
     if (e.target !== svg) return;
     if (e.key === '+' || e.key === '=') { e.preventDefault(); setZoom(zoom * 1.5); }
     else if (e.key === '-') { e.preventDefault(); setZoom(zoom / 1.5); }
