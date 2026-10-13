@@ -25,7 +25,13 @@ export function random(words){let [a,b,c,d]=words;const next=()=>{a|=0;b|=0;c|=0
 export function launch(map,angle,power){const a=angle*Math.PI/180;return{x:map.spawn[0],y:map.spawn[1],vx:Math.cos(a)*power,vy:Math.sin(a)*power,time:0};}
 function acceleration(x,y,stars){let ax=0,ay=0;for(const s of stars){const dx=s.x-x,dy=s.y-y,soft=s.kind!=='star'?4:14,d2=dx*dx+dy*dy+soft*soft,f=(s.kind==='whitehole'?-1:1)*s.mass/Math.pow(d2,1.5);ax+=dx*f;ay+=dy*f;}return[ax,ay];}
 // Velocity Verlet is second-order and avoids the energy drift of forward Euler.
-export function step(b,stars,dt=DT){const [ax,ay]=acceleration(b.x,b.y,stars),x=b.x+b.vx*dt+.5*ax*dt*dt,y=b.y+b.vy*dt+.5*ay*dt*dt,[bx,by]=acceleration(x,y,stars);return{x,y,vx:b.vx+.5*(ax+bx)*dt,vy:b.vy+.5*(ay+by)*dt,time:b.time+dt};}
+export function step(b,stars,dt=DT,damping=0){
+ if(!Number.isFinite(damping)||damping<0||damping>.02)throw Error('Invalid damping');
+ // Symmetric drag splitting retains second-order accuracy and exact exponential velocity decay.
+ const decay=damping?Math.exp(-damping*dt*.5):1;if(damping)b={...b,vx:b.vx*decay,vy:b.vy*decay};
+ const [ax,ay]=acceleration(b.x,b.y,stars),x=b.x+b.vx*dt+.5*ax*dt*dt,y=b.y+b.vy*dt+.5*ay*dt*dt,[bx,by]=acceleration(x,y,stars);
+ return{x,y,vx:(b.vx+.5*(ax+bx)*dt)*decay,vy:(b.vy+.5*(ay+by)*dt)*decay,time:b.time+dt};
+}
 function hitsCircle(a,b,x,y,r){const dx=b.x-a.x,dy=b.y-a.y,n=dx*dx+dy*dy,f=n?Math.max(0,Math.min(1,((x-a.x)*dx+(y-a.y)*dy)/n)):0;return Math.hypot(a.x+dx*f-x,a.y+dy*f-y)<r;}
 export function status(ball,map,previous=ball){
  for(const s of map.stars)if(hitsCircle(previous,ball,s.x,s.y,s.r+3))return s.kind;
@@ -33,8 +39,8 @@ export function status(ball,map,previous=ball){
  if(ball.x<2||ball.x>WORLD.width-2||ball.y<2||ball.y>WORLD.height-2)return 'escape';
  return 'flying';
 }
-export function advance(ball,map,duration=DT){let remaining=duration,b=ball,result='flying',steps=0;
- while(remaining>1e-10){let h=Math.min(DT,remaining),speed=Math.hypot(b.vx,b.vy);for(const s of map.stars){const d=Math.max(s.r,Math.hypot(s.x-b.x,s.y-b.y));h=Math.min(h,.02*Math.sqrt(d*d*d/s.mass),.12*d/(speed+1));}h=Math.min(remaining,Math.max(1/30720,h));const prev=b;b=step(b,map.stars,h);steps++;remaining-=h;result=status(b,map,prev);if(result!=='flying')break;}
+export function advance(ball,map,duration=DT,damping=0){let remaining=duration,b=ball,result='flying',steps=0;
+ while(remaining>1e-10){let h=Math.min(DT,remaining),speed=Math.hypot(b.vx,b.vy);for(const s of map.stars){const d=Math.max(s.r,Math.hypot(s.x-b.x,s.y-b.y));h=Math.min(h,.02*Math.sqrt(d*d*d/s.mass),.12*d/(speed+1));}h=Math.min(remaining,Math.max(1/30720,h));const prev=b;b=step(b,map.stars,h,damping);steps++;remaining-=h;result=status(b,map,prev);if(result!=='flying')break;}
  return{ball:b,result,steps};
 }
 export function generateMap({seed}={}){
