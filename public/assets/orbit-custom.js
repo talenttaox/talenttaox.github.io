@@ -1,11 +1,11 @@
 import {FIELD,WORLD} from './orbit-model.js';
 const kinds=['star','blackhole','whitehole'];
-export function validateCustom(map){
+export function validateCustom(map,maxStars=20){
  const errors=[],stars=map?.stars;if(!Array.isArray(stars)||stars.length>56)return ['shape'];
  if(map.width!==WORLD.width||map.height!==WORLD.height||map.spawn?.[0]!==FIELD.x+160||map.spawn?.[1]!==FIELD.y+1200||map.target?.x!==FIELD.x+4640||map.target?.y!==FIELD.y+1200)errors.push('endpoints');
  const pair=map.dipole,paired=new Set(pair||[]);
  if(pair&&(!Array.isArray(pair)||pair.length!==2||pair[0]===pair[1]||pair.some(i=>!Number.isInteger(i)||i<0||i>=stars.length)))return ['dipole'];
- for(const [kind,max] of [['star',40],['blackhole',8],['whitehole',8]])if(stars.filter(s=>s.kind===kind).length>max)errors.push('count');
+ for(const [kind,max] of [['star',maxStars],['blackhole',8],['whitehole',8]])if(stars.filter(s=>s.kind===kind).length>max)errors.push('count');
  for(const [i,s] of stars.entries()){
   if(!s||!kinds.includes(s.kind)||!['x','y','r','mass'].every(k=>Number.isFinite(s[k]))){errors.push('shape');continue;}
   const hole=s.kind!=='star';if(s.r<(hole?3:10)||s.r>(hole?5:24)||!Number.isInteger(s.mass))errors.push('size');
@@ -23,6 +23,6 @@ export function decodeCustom(code){
  if(typeof code!=='string'||code.length>20000||!/^C1-[A-Za-z0-9_-]+$/.test(code))throw Error('Invalid custom code');
  let data;try{data=JSON.parse(atob(code.slice(3).replaceAll('-','+').replaceAll('_','/')));}catch{throw Error('Invalid custom code');}
  if(!Array.isArray(data)||data.length!==3||data[0]!==1||!Array.isArray(data[1])||data[1].length>56||data[1].some(row=>!Array.isArray(row)||row.length!==5||!Number.isInteger(row[0])||!kinds[row[0]]))throw Error('Invalid custom map');
- const map={spawn:[FIELD.x+160,FIELD.y+1200],target:{x:FIELD.x+4640,y:FIELD.y+1200},stars:data[1].map(([kind,x,y,r,mass])=>({kind:kinds[kind],x,y,r,mass})),width:WORLD.width,height:WORLD.height};if(data[2]!==null)map.dipole=data[2];map.seed=encodeCustom(map);return map;
+ const map={spawn:[FIELD.x+160,FIELD.y+1200],target:{x:FIELD.x+4640,y:FIELD.y+1200},stars:data[1].map(([kind,x,y,r,mass])=>({kind:kinds[kind],x,y,r,mass})),width:WORLD.width,height:WORLD.height};if(data[2]!==null)map.dipole=data[2];const errors=validateCustom(map,40);if(errors.length)throw Error(errors.join(','));map.seed='C1-'+btoa(JSON.stringify(data)).replaceAll('+','-').replaceAll('/','_').replace(/=+$/,'');return map;
 }
 export function customConfig(code){const map=decodeCustom(code);return{seed:map.seed,starCount:map.stars.filter(s=>s.kind==='star').length,blackHoleCount:map.stars.filter(s=>s.kind==='blackhole').length,whiteHoleCount:map.stars.filter(s=>s.kind==='whitehole').length,dipole:!!map.dipole,words:customWords(map.seed)};}

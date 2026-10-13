@@ -8,6 +8,7 @@ export function createSeed(starCount,blackHoleCount,entropy){
  return `O2-${starCount.toString(16).padStart(2,'0')}-${blackHoleCount.toString(16)}-${entropy}`.toUpperCase();
 }
 export function createExtendedSeed(stars,black,white,dipole,entropy){
+ if(stars>20)throw Error('Star limit is 20');
  createSeed(stars,black,entropy);if(!Number.isInteger(white)||white<0||white>8)throw Error('Invalid white hole count');
  if(dipole){black=Math.max(1,black);white=Math.max(1,white);}
  return `O5-${stars.toString(16).padStart(2,'0')}-${black}-${white}-${dipole?1:0}-${entropy}`.toUpperCase();

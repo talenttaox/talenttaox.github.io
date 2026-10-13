@@ -15,9 +15,9 @@ test('O4 seeds preserve the published layout and white-hole strengths',()=>{
 });
 test('New seeds replay weaker central white holes and a close dipole with correct counts and spacing',()=>{
  for(let n=0;n<100;n++){
-  const seed=createExtendedSeed(40,n%9,n%9,true,n.toString(16).padStart(32,'0')),map=generateMap({seed}),config=parseSeed(seed);
+  const seed=createExtendedSeed(20,n%9,n%9,true,n.toString(16).padStart(32,'0')),map=generateMap({seed}),config=parseSeed(seed);
   assert.deepEqual(generateMap({seed:seed.toLowerCase()}),map);
-  for(const [kind,count] of [['star',40],['blackhole',config.blackHoleCount],['whitehole',config.whiteHoleCount]])assert.equal(map.stars.filter(s=>s.kind===kind).length,count);
+  for(const [kind,count] of [['star',20],['blackhole',config.blackHoleCount],['whitehole',config.whiteHoleCount]])assert.equal(map.stars.filter(s=>s.kind===kind).length,count);
   const [black,white]=map.dipole.map(i=>map.stars[i]);assert.ok(white.mass<=black.mass*.5);assert.equal(black.r,white.r);const d=Math.hypot(black.x-white.x,black.y-white.y);assert.ok(d>=24&&d<=40);
   for(const s of map.stars.filter(s=>s.kind==='whitehole')){assert.ok(s.x>=FIELD.x+1440&&s.x<=FIELD.x+3360);const limit=s===white?black.mass/2:40000000;assert.ok(s.mass<=limit);}
   for(let i=0;i<map.stars.length;i++)for(let j=i+1;j<map.stars.length;j++){if(i===0&&j===1)continue;const a=map.stars[i],b=map.stars[j];assert.ok(Math.hypot(a.x-b.x,a.y-b.y)-a.r-b.r>=240);}
