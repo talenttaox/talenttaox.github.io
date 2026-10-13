@@ -21,7 +21,7 @@ export function status(ball,map,previous=ball){
  for(const s of map.stars)if(hitsCircle(previous,ball,s.x,s.y,s.r+3))return s.kind==='blackhole'?'blackhole':'star';
  if(map.target&&hitsCircle(previous,ball,map.target.x,map.target.y,40))return 'win';
  if(ball.x<2||ball.x>WORLD.width-2||ball.y<2||ball.y>WORLD.height-2)return 'escape';
- return ball.time>=40?'timeout':'flying';
+ return 'flying';
 }
 export function advance(ball,map,duration=DT){let remaining=duration,b=ball,result='flying',steps=0;
  while(remaining>1e-10){let h=Math.min(DT,remaining),speed=Math.hypot(b.vx,b.vy);for(const s of map.stars){const d=Math.max(s.r,Math.hypot(s.x-b.x,s.y-b.y));h=Math.min(h,.02*Math.sqrt(d*d*d/s.mass),.12*d/(speed+1));}h=Math.min(remaining,Math.max(1/30720,h));const prev=b;b=step(b,map.stars,h);steps++;remaining-=h;result=status(b,map,prev);if(result!=='flying')break;}

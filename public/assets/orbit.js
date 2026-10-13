@@ -4,7 +4,7 @@ import {downloadTrajectory} from './orbit-export.js';
 const app=document.querySelector('[data-game="orbit"]');
 if(app){
  const zh=document.body.dataset.lang==='zh',t=(a,b)=>zh?a:b,$=id=>document.getElementById(id),canvas=$('orbit-canvas'),ctx=canvas.getContext('2d');
- const field=document.createElement('canvas'),fc=field.getContext('2d'),palette=['#80c9dc','#e9b67f','#b1a5e9','#8ccfae','#db99b1'];
+ const pathCache=new WeakMap();const field=document.createElement('canvas'),fc=field.getContext('2d'),palette=['#80c9dc','#e9b67f','#b1a5e9','#8ccfae','#db99b1'];
  let map,ball=null,trails=[],active=null,shots=0,frame=0,last=0,carry=0,worker,loading=false,panMode=false,best=0;
  const view={x:0,y:0,zoom:1},angle=()=>Number($('orbit-angle').value),power=()=>Number($('orbit-power').value);
  const camera={width:WORLD.width,height:WORLD.height};const vw=()=>camera.width/view.zoom,vh=()=>camera.height/view.zoom;
@@ -12,6 +12,7 @@ if(app){
  const unit=()=>vw()/rect().width;
  const point=e=>{const r=rect();return{x:view.x+(e.clientX-r.left)/r.width*vw(),y:view.y+(e.clientY-r.top)/r.height*vh()};};
  function transform(c){c.setTransform(canvas.width/vw(),0,0,canvas.height/vh(),-view.x*canvas.width/vw(),-view.y*canvas.height/vh());}
+ function trailPath(trail){let cached=pathCache.get(trail);if(!cached){cached={path:new Path2D(),length:0};pathCache.set(trail,cached);}while(cached.length<trail.points.length){const [x,y]=trail.points[cached.length];if(cached.length)cached.path.lineTo(x,y);else cached.path.moveTo(x,y);cached.length++;}return cached.path;}
  function circle(c,x,y,r){c.beginPath();c.arc(x,y,r,0,Math.PI*2);}
  function syncButtons(){for(const id of ['orbit-launch','orbit-stage-launch'])$(id).disabled=loading||!!ball;for(const id of ['orbit-export-png','orbit-export-svg'])$(id).disabled=loading||!trails.length;}
  function setAngle(value){const rounded=Math.round(value*10)/10;$('orbit-angle').value=Math.max(-180,Math.min(180,rounded));controls();}
@@ -48,7 +49,7 @@ if(app){
   for(const [x,y,color,label,r] of [[...map.spawn,'#9cdeeb',t('起点','START'),17],[map.target.x,map.target.y,'#e9b67f',t('终点','GOAL'),40]]){const radius=Math.max(r,7*u);fc.strokeStyle=color;fc.lineWidth=1.4*u;circle(fc,x,y,radius);fc.stroke();fc.globalAlpha=.4;circle(fc,x,y,radius+5*u);fc.stroke();fc.globalAlpha=1;fc.fillStyle=color;circle(fc,x,y,2.2*u);fc.fill();fc.font=`${11*u}px sans-serif`;fc.textAlign='center';fc.fillText(label,x,y+radius+20*u);}
  }
  function paint(){updateScore();ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,canvas.width,canvas.height);if(!map)return;ctx.drawImage(field,0,0);ctx.save();transform(ctx);const u=unit();
-  trails.slice(-16).forEach((trail,i)=>{ctx.globalAlpha=trail===active?.95:.25+.3*i/Math.max(1,trails.length);ctx.strokeStyle=trail.result==='win'?'#8de1be':trail.color;ctx.lineWidth=(trail===active?1.5:1)*u;ctx.beginPath();trail.points.forEach(([x,y],n)=>n?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.stroke();});ctx.globalAlpha=1;
+  trails.slice(-16).forEach((trail,i)=>{ctx.globalAlpha=trail===active?.95:.25+.3*i/Math.max(1,trails.length);ctx.strokeStyle=trail.result==='win'?'#8de1be':trail.color;ctx.lineWidth=(trail===active?1.5:1)*u;ctx.stroke(trailPath(trail));});ctx.globalAlpha=1;
   if(active){const summary=deflectionSummary(active.stats);ctx.font=`${9*u}px sans-serif`;ctx.textAlign='left';for(const [i,e] of summary.events.entries()){ctx.fillStyle=active.color;circle(ctx,e.x,e.y,3*u);ctx.fill();ctx.fillText(String(i+1),e.x+5*u,e.y-5*u);}}
   const [x,y]=map.spawn,a=angle()*Math.PI/180,len=110+power()*.25;ctx.strokeStyle='#80c9dc';ctx.lineWidth=1.2*u;ctx.setLineDash([3*u,5*u]);ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+Math.cos(a)*len,y+Math.sin(a)*len);ctx.stroke();ctx.setLineDash([]);const end=[x+Math.cos(a)*len,y+Math.sin(a)*len];ctx.beginPath();ctx.moveTo(end[0]-Math.cos(a-.5)*8*u,end[1]-Math.sin(a-.5)*8*u);ctx.lineTo(...end);ctx.lineTo(end[0]-Math.cos(a+.5)*8*u,end[1]-Math.sin(a+.5)*8*u);ctx.stroke();
   if(ball){ctx.shadowBlur=12;ctx.shadowColor=active.color;ctx.fillStyle=active.color;circle(ctx,ball.x,ball.y,Math.max(4,3*u));ctx.fill();ctx.shadowBlur=0;}ctx.restore();

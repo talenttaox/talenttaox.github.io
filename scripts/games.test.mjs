@@ -30,13 +30,17 @@ test('Zero launch power and tiny black-hole collisions keep their physical behav
  const map=generateMap({seed:seedFor(0,0,1)}),b=launch(map,12.3,0);assert.equal(b.vx,0);assert.equal(b.vy,0);assert.equal(advance(b,map).ball.x,b.x);
  const hole={x:3600,y:2400,r:3,mass:100000000,kind:'blackhole'};assert.ok(advance(b,{...map,stars:[hole]}).ball.vx>0);
  assert.equal(status({x:3700,y:2400,time:1},{...map,stars:[hole]},{x:3500,y:2400}),'blackhole');
- assert.equal(status({x:500,y:500,time:40},map),'timeout');assert.equal(status({...map.target,time:1},map),'win');
+ assert.equal(status({x:500,y:500,time:40000},map),'flying');assert.equal(status({...map.target,time:1},map),'win');
 });
 test('Adaptive integration conserves energy near a black hole and agrees with smaller timesteps',()=>{
  const hole={x:3600,y:2400,r:4,mass:100000000,kind:'blackhole'},r=30,speed=Math.sqrt(hole.mass*r*r/Math.pow(r*r+16,1.5)),map={stars:[hole]};
  const initial={x:hole.x+r,y:hole.y,vx:0,vy:speed,time:0},energy=b=>.5*(b.vx*b.vx+b.vy*b.vy)-hole.mass/Math.sqrt((b.x-hole.x)**2+(b.y-hole.y)**2+16);let a=initial,b=initial,totalSteps=0;
  for(let i=0;i<240;i++){const n=advance(a,map);assert.equal(n.result,'flying');a=n.ball;totalSteps+=n.steps;for(let j=0;j<16;j++)b=advance(b,map,DT/16).ball;}
  assert.ok(totalSteps>480);assert.ok(Math.abs((energy(a)-energy(initial))/energy(initial))<.0001);assert.ok(Math.hypot(a.x-b.x,a.y-b.y)<1);
+});
+test('A stable orbit continues beyond the former forty-second limit',()=>{
+ const hole={x:3600,y:2400,r:4,mass:100000000,kind:'blackhole'},r=100,velocity=Math.sqrt(hole.mass*r*r/Math.pow(r*r+16,1.5)),map={stars:[hole]};let ball={x:hole.x+r,y:hole.y,vx:0,vy:velocity,time:0};
+ for(let n=0;n<60/DT;n++){const next=advance(ball,map);ball=next.ball;assert.equal(next.result,'flying');}assert.ok(ball.time>59.9);
 });
 test('Shadow rotation preserves geometry',()=>{
  for(let i=0;i<3;i++)for(const v of shadowVoxels(i)){assert.deepEqual(rotate(v,0,0),v);assert.ok(Math.abs(Math.hypot(...rotate(v,38,62))-Math.hypot(...v))<1e-9);}
