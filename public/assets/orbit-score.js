@@ -3,8 +3,8 @@ const radians=Math.PI/180;
 export function createFlightStats(initialSpeed){return{initialSpeed,time:0,events:[],current:null};}
 function inField(p){return p.x>=FIELD.x&&p.x<=FIELD.x+FIELD.width&&p.y>=FIELD.y&&p.y<=FIELD.y+FIELD.height;}
 function influence(ball,star){
- const dx=star.x-ball.x,dy=star.y-ball.y,d=Math.hypot(dx,dy),limit=star.kind==='blackhole'?800:600;
- if(d>limit)return 0;const soft=star.kind==='blackhole'?4:14,f=star.mass/Math.pow(dx*dx+dy*dy+soft*soft,1.5),ax=dx*f,ay=dy*f,speed2=ball.vx*ball.vx+ball.vy*ball.vy;
+ const dx=star.x-ball.x,dy=star.y-ball.y,d=Math.hypot(dx,dy),limit=star.kind!=='star'?800:600;
+ if(d>limit)return 0;const soft=star.kind!=='star'?4:14,f=star.mass/Math.pow(dx*dx+dy*dy+soft*soft,1.5),ax=dx*f,ay=dy*f,speed2=ball.vx*ball.vx+ball.vy*ball.vy;
  if(Math.hypot(ax,ay)<35||speed2<25)return 0;
  const angular=Math.abs(ball.vx*ay-ball.vy*ax)/speed2;return angular>=.005?angular:0;
 }
