@@ -4,12 +4,18 @@ import {createExtendedSeed,parseSeed,generateMap,step,status,FIELD} from '../pub
 import {perturbations} from '../public/assets/orbit-experiment.js';
 import {trajectorySVG} from '../public/assets/orbit-export.js';
 import {createFlightStats} from '../public/assets/orbit-score.js';
+import {createHash} from 'node:crypto';
+test('O3 seeds preserve the published map layout after distribution changes',()=>{
+ const map=generateMap({seed:'O3-10-2-2-1-0123456789ABCDEFFEDCBA9876543210'});
+ assert.equal(createHash('sha256').update(JSON.stringify(map)).digest('hex'),'ae0350731a10fb12996d8154fe25cc28dc235c47e34d6ba99bba969b3aa92b84');
+});
 test('New seeds replay white holes and a balanced dipole with correct counts and boundaries',()=>{
  for(let n=0;n<100;n++){
   const seed=createExtendedSeed(40,n%9,n%9,true,n.toString(16).padStart(32,'0')),map=generateMap({seed}),config=parseSeed(seed);
   assert.deepEqual(generateMap({seed:seed.toLowerCase()}),map);
   for(const [kind,count] of [['star',40],['blackhole',config.blackHoleCount],['whitehole',config.whiteHoleCount]])assert.equal(map.stars.filter(s=>s.kind===kind).length,count);
-  const [black,white]=map.dipole.map(i=>map.stars[i]);assert.equal(black.mass,white.mass);assert.equal(black.r,white.r);const d=Math.hypot(black.x-white.x,black.y-white.y);assert.ok(d>=60&&d<=120);
+  const [black,white]=map.dipole.map(i=>map.stars[i]);assert.equal(black.mass,white.mass);assert.equal(black.r,white.r);const d=Math.hypot(black.x-white.x,black.y-white.y);assert.ok(d>=24&&d<=40);
+  for(let i=0;i<map.stars.length;i++)for(let j=i+1;j<map.stars.length;j++){if(i===0&&j===1)continue;const a=map.stars[i],b=map.stars[j];assert.ok(Math.hypot(a.x-b.x,a.y-b.y)-a.r-b.r>=240);}
   for(const s of map.stars)assert.ok(s.x-s.r>FIELD.x&&s.x+s.r<FIELD.x+FIELD.width&&s.y-s.r>FIELD.y&&s.y+s.r<FIELD.y+FIELD.height);
  }
  assert.throws(()=>parseSeed('O3-01-0-1-1-'+'0'.repeat(32)));assert.throws(()=>createExtendedSeed(0,0,9,false,'0'.repeat(32)));
