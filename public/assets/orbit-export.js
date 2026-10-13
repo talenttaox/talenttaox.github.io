@@ -21,7 +21,7 @@ export function trajectorySVG(map,trails,{zh=true,pixelWidth=1800}={}){
  for(const [x,y,color,label] of [[...map.spawn,'#9cdeeb',t('起点','START')],[map.target.x,map.target.y,'#e9b67f',t('终点','GOAL')]])svg+=circle(x,y,40,`fill="#14263a" stroke="${color}" stroke-width="6"`)+text(x-48,y+105,label,46,color);
  svg+=`<rect y="${WORLD.height}" width="${WORLD.width}" height="${footer}" fill="#0c1621"/>`;
  // A bounded visible legend keeps PNG dimensions reasonable; metadata retains every flight.
- svg+=text(100,WORLD.height+90,t('轨道捕手 · 完整地图与轨迹','Orbit catcher · Full map and trajectories'),56,'#e2edf4')+text(100,WORLD.height+175,`SEED / ${map.seed}`,40);
+ svg+=text(100,WORLD.height+90,t('轨道捕手 · 完整地图与轨迹','Orbit catcher · Full map and trajectories'),56,'#e2edf4')+text(100,WORLD.height+175,`SEED / ${map.seed.startsWith('C1-')?'C1-'+parseSeed(map.seed).words[0].toString(16)+' · '+t('完整地图码见文件元数据','Full map code in metadata'):map.seed}`,40);
  if(trails.length>16)svg+=text(4200,WORLD.height+90,t(`共 ${trails.length} 条轨迹 · 下列为最新 16 条详情`,`${trails.length} trajectories · Latest 16 records below`),36);
  trails.slice(-16).forEach((trail,i)=>{const record=records[records.length-Math.min(trails.length,16)+i],color=trail.result==='win'?'#8de1be':trail.color,x=100+(i%2)*3500,y=WORLD.height+290+Math.floor(i/2)*125;svg+=text(x,y,`#${trail.number} · ${record.score.total} ${t('分','pts')} · ${record.label}`,44,color)+text(x,y+58,t(`方向 ${record.initialAngle.toFixed(1)}° · 初速 ${record.initialSpeed} · ${record.time.toFixed(2)} 秒 · ${record.score.count} 次偏转 / ${record.score.degrees.toFixed(1)}°`,`Angle ${record.initialAngle.toFixed(1)}° · speed ${record.initialSpeed} · ${record.time.toFixed(2)} s · ${record.score.count} deflections / ${record.score.degrees.toFixed(1)}°`),36);});
  return svg+`<metadata>${esc(JSON.stringify({seed:map.seed,scoreVersion:1,flights:records}))}</metadata></svg>`;
@@ -29,5 +29,5 @@ export function trajectorySVG(map,trails,{zh=true,pixelWidth=1800}={}){
 export async function downloadTrajectory(map,trails,{format='svg',zh=true,choice='latest'}={}){
  const svg=trajectorySVG(map,trails,{zh,pixelWidth:format==='png'?3600:1800});let blob=new Blob([svg],{type:'image/svg+xml;charset=utf-8'});
  if(format==='png'){const url=URL.createObjectURL(blob);try{const image=new Image();await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=reject;image.src=url;});const c=document.createElement('canvas');c.width=image.naturalWidth;c.height=image.naturalHeight;c.getContext('2d').drawImage(image,0,0);blob=await new Promise((resolve,reject)=>c.toBlob(b=>b?resolve(b):reject(Error('PNG export failed')),'image/png'));}finally{URL.revokeObjectURL(url);}}
- const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`orbit-${map.seed}-${choice}.${format}`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500);
+ const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`orbit-${map.seed.startsWith('C1-')?'C1-'+parseSeed(map.seed).words[0].toString(16):map.seed}-${choice}.${format}`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500);
 }

@@ -1,3 +1,4 @@
+import {decodeCustom,customConfig} from './orbit-custom.js';
 export const BORDER=1200;
 export const FIELD={x:BORDER,y:BORDER,width:4800,height:2400};
 export const WORLD={width:FIELD.width+BORDER*2,height:FIELD.height+BORDER*2,minDistance:4480},DT=1/240;
@@ -12,6 +13,7 @@ export function createExtendedSeed(stars,black,white,dipole,entropy){
  return `O5-${stars.toString(16).padStart(2,'0')}-${black}-${white}-${dipole?1:0}-${entropy}`.toUpperCase();
 }
 export function parseSeed(value){
+ if(typeof value==='string'&&value.trim().startsWith('C1-'))return customConfig(value.trim());
  if(typeof value!=='string')throw Error('Invalid seed');const seed=value.trim().toUpperCase();
  const old=seed.match(/^O2-([0-9A-F]{2})-([0-8])-([0-9A-F]{32})$/),modern=seed.match(/^O[345]-([0-9A-F]{2})-([0-8])-([0-8])-([01])-([0-9A-F]{32})$/),match=old||modern;
  if(!match)throw Error('Invalid seed');const starCount=parseInt(match[1],16),blackHoleCount=Number(match[2]),whiteHoleCount=modern?Number(match[3]):0,dipole=modern?match[4]==='1':false;
@@ -35,6 +37,7 @@ export function advance(ball,map,duration=DT){let remaining=duration,b=ball,resu
  return{ball:b,result,steps};
 }
 export function generateMap({seed}={}){
+ if(typeof seed==='string'&&seed.trim().startsWith('C1-'))return decodeCustom(seed.trim());
  const config=parseSeed(seed),rnd=random(config.words),between=(a,b)=>a+(b-a)*rnd(),gentle=config.seed.startsWith('O5-'),spread=gentle||config.seed.startsWith('O4-');
  // No route search, route filtering or symmetric fallback. The first random layout is the map.
  const map={seed:config.seed,spawn:[FIELD.x+160,FIELD.y+1200],target:{x:FIELD.x+4640,y:FIELD.y+1200},stars:[],width:WORLD.width,height:WORLD.height};
