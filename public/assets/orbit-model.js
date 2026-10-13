@@ -9,11 +9,11 @@ export function createSeed(starCount,blackHoleCount,entropy){
 export function createExtendedSeed(stars,black,white,dipole,entropy){
  createSeed(stars,black,entropy);if(!Number.isInteger(white)||white<0||white>8)throw Error('Invalid white hole count');
  if(dipole){black=Math.max(1,black);white=Math.max(1,white);}
- return `O4-${stars.toString(16).padStart(2,'0')}-${black}-${white}-${dipole?1:0}-${entropy}`.toUpperCase();
+ return `O5-${stars.toString(16).padStart(2,'0')}-${black}-${white}-${dipole?1:0}-${entropy}`.toUpperCase();
 }
 export function parseSeed(value){
  if(typeof value!=='string')throw Error('Invalid seed');const seed=value.trim().toUpperCase();
- const old=seed.match(/^O2-([0-9A-F]{2})-([0-8])-([0-9A-F]{32})$/),modern=seed.match(/^O[34]-([0-9A-F]{2})-([0-8])-([0-8])-([01])-([0-9A-F]{32})$/),match=old||modern;
+ const old=seed.match(/^O2-([0-9A-F]{2})-([0-8])-([0-9A-F]{32})$/),modern=seed.match(/^O[345]-([0-9A-F]{2})-([0-8])-([0-8])-([01])-([0-9A-F]{32})$/),match=old||modern;
  if(!match)throw Error('Invalid seed');const starCount=parseInt(match[1],16),blackHoleCount=Number(match[2]),whiteHoleCount=modern?Number(match[3]):0,dipole=modern?match[4]==='1':false;
  if(starCount>40||dipole&&(!blackHoleCount||!whiteHoleCount))throw Error('Invalid seed configuration');
  return{seed,starCount,blackHoleCount,whiteHoleCount,dipole,words:match[modern?5:3].match(/.{8}/g).map(s=>parseInt(s,16))};
@@ -35,21 +35,24 @@ export function advance(ball,map,duration=DT){let remaining=duration,b=ball,resu
  return{ball:b,result,steps};
 }
 export function generateMap({seed}={}){
- const config=parseSeed(seed),rnd=random(config.words),between=(a,b)=>a+(b-a)*rnd(),spread=config.seed.startsWith('O4-');
+ const config=parseSeed(seed),rnd=random(config.words),between=(a,b)=>a+(b-a)*rnd(),gentle=config.seed.startsWith('O5-'),spread=gentle||config.seed.startsWith('O4-');
  // No route search, route filtering or symmetric fallback. The first random layout is the map.
  const map={seed:config.seed,spawn:[FIELD.x+160,FIELD.y+1200],target:{x:FIELD.x+4640,y:FIELD.y+1200},stars:[],width:WORLD.width,height:WORLD.height};
  if(config.dipole){
-  const x=FIELD.x+between(750,4050),y=FIELD.y+between(330,2070),r=between(3,5),mass=Math.round(between(80000000,120000000)),a=between(0,Math.PI*2),d=spread?between(24,40):between(60,120);
-  map.stars.push({x,y,r,kind:'blackhole',mass},{x:x+Math.cos(a)*d,y:y+Math.sin(a)*d,r,kind:'whitehole',mass});map.dipole=[0,1];
+  const x=FIELD.x+between(gentle?1480:750,gentle?3320:4050),y=FIELD.y+between(330,2070),r=between(3,5),mass=Math.round(between(80000000,120000000)),a=between(0,Math.PI*2),d=spread?between(24,40):between(60,120);
+  map.stars.push({x,y,r,kind:'blackhole',mass},{x:x+Math.cos(a)*d,y:y+Math.sin(a)*d,r,kind:'whitehole',mass:gentle?Math.floor(mass*.5):mass});map.dipole=[0,1];
  }
- for(const [kind,count] of [['star',config.starCount],['blackhole',config.blackHoleCount-(config.dipole?1:0)],['whitehole',config.whiteHoleCount-(config.dipole?1:0)]])for(let i=0;i<count;i++){
-  const r=kind!=='star'?between(3,5):between(10,24),mass=Math.round(kind!=='star'?between(80000000,120000000):60000*r*r);let s;
+ const counts=[['star',config.starCount],['blackhole',config.blackHoleCount-(config.dipole?1:0)],['whitehole',config.whiteHoleCount-(config.dipole?1:0)]];
+ // Reserve central positions for repulsive bodies before placing the rest of the field.
+ if(gentle)counts.unshift(counts.pop());
+ for(const [kind,count] of counts)for(let i=0;i<count;i++){
+  const r=kind!=='star'?between(3,5):between(10,24),mass=Math.round(gentle&&kind==='whitehole'?between(30000000,40000000):kind!=='star'?between(80000000,120000000):60000*r*r);let s;
   if(spread){
    // Reject crowded positions; retain the widest available gap if a dense field fills up.
    // The intentionally close dipole is placed first and reserves space around both cores.
    let bestGap=-Infinity;
    for(let attempt=0;attempt<400;attempt++){
-    const candidate={x:FIELD.x+between(650,4150),y:FIELD.y+between(230,2170),r,kind,mass},gap=Math.min(...map.stars.map(p=>Math.hypot(candidate.x-p.x,candidate.y-p.y)-r-p.r));
+    const central=gentle&&kind==='whitehole',candidate={x:FIELD.x+between(central?1440:650,central?3360:4150),y:FIELD.y+between(230,2170),r,kind,mass},gap=Math.min(...map.stars.map(p=>Math.hypot(candidate.x-p.x,candidate.y-p.y)-r-p.r));
     if(gap>bestGap){s=candidate;bestGap=gap;}if(gap>=240)break;
    }
   }else for(let attempt=0;attempt<400;attempt++){s={x:FIELD.x+between(650,4150),y:FIELD.y+between(230,2170),r,kind,mass};if(map.stars.every(p=>Math.hypot(s.x-p.x,s.y-p.y)>s.r+p.r+20))break;}
