@@ -31,12 +31,12 @@ test('White holes exert the same force magnitude in the opposite direction',()=>
  assert.ok(black.vx>0&&white.vx<0);assert.ok(Math.abs(black.vx+white.vx)<1e-10);
  assert.equal(status({...b,x:2000},{stars:[{...body,kind:'whitehole'}]}),'whitehole');
 });
-test('Butterfly samples stay distinct, exclude the centre and preserve the other parameter',()=>{
- for(const angle of [-180,0,180]){const samples=perturbations('angle',angle,720);assert.equal(samples.length,10);assert.equal(new Set(samples.map(s=>s.angle)).size,10);for(const s of samples){assert.equal(s.power,720);assert.ok(s.angle>=-180&&s.angle<180);assert.notEqual(s.angle,angle===180?-180:angle);}}
- for(const power of [0,1,4,500,996,999,1000]){const samples=perturbations('power',12.3,power);assert.equal(samples.length,10);assert.equal(new Set(samples.map(s=>s.power)).size,10);for(const s of samples){assert.equal(s.angle,12.3);assert.ok(s.power>=0&&s.power<=1000&&s.power!==power);}}
- assert.deepEqual(perturbations('power',0,500).map(s=>s.power),[495,496,497,498,499,501,502,503,504,505]);
+test('Butterfly samples include the unchanged centre once and preserve the other parameter',()=>{
+ for(const angle of [-180,0,180]){const samples=perturbations('angle',angle,720);assert.equal(samples.length,11);assert.equal(samples.filter(s=>s.baseline&&s.angle===angle&&s.power===720).length,1);assert.equal(new Set(samples.map(s=>s.angle)).size,11);for(const s of samples){assert.equal(s.power,720);assert.ok(s.angle>=-180&&s.angle<=180);if(!s.baseline)assert.notEqual(s.angle,angle===180?-180:angle);}}
+ for(const power of [0,1,4,500,996,999,1000]){const samples=perturbations('power',12.3,power);assert.equal(samples.length,11);assert.equal(samples.filter(s=>s.baseline&&s.angle===12.3&&s.power===power).length,1);assert.equal(new Set(samples.map(s=>s.power)).size,11);for(const s of samples){assert.equal(s.angle,12.3);assert.ok(s.power>=0&&s.power<=1000&&(s.baseline?s.power===power:s.power!==power));}}
+ assert.deepEqual(perturbations('power',0,500).map(s=>s.power),[495,496,497,498,499,500,501,502,503,504,505]);
 });
-test('Experiment exports preserve all ten immutable sample parameters and white hole styling',()=>{
- const map=generateMap({seed:createExtendedSeed(0,1,1,true,'0'.repeat(32))});const trails=perturbations('angle',0,720).map((s,i)=>({number:i+1,group:1,experiment:'angle',center:{angle:0,power:720},initialAngle:s.angle,initialSpeed:s.power,color:'#fff',result:'flying',stats:createFlightStats(s.power),points:[map.spawn]}));
- const svg=trajectorySVG(map,trails);assert.ok(svg.includes('#fffbe3'));const metadata=JSON.parse(svg.match(/<metadata>(.*?)<\/metadata>/s)[1].replaceAll('&quot;','"'));assert.equal(metadata.flights.length,10);assert.equal(metadata.flights[0].experiment,'angle');assert.deepEqual(metadata.flights[0].center,{angle:0,power:720});
+test('Experiment exports preserve all eleven immutable sample parameters and white hole styling',()=>{
+ const map=generateMap({seed:createExtendedSeed(0,1,1,true,'0'.repeat(32))});const trails=perturbations('angle',0,720).map((s,i)=>({number:i+1,group:1,baseline:!!s.baseline,experiment:'angle',center:{angle:0,power:720},initialAngle:s.angle,initialSpeed:s.power,color:'#fff',result:'flying',stats:createFlightStats(s.power),points:[map.spawn]}));
+ const svg=trajectorySVG(map,trails);assert.ok(svg.includes('#fffbe3'));const metadata=JSON.parse(svg.match(/<metadata>(.*?)<\/metadata>/s)[1].replaceAll('&quot;','"'));assert.equal(metadata.flights.length,11);assert.equal(metadata.flights[0].experiment,'angle');assert.equal(metadata.flights.filter(f=>f.baseline).length,1);assert.deepEqual(metadata.flights[0].center,{angle:0,power:720});
 });
