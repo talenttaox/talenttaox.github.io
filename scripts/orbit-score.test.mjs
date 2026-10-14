@@ -31,3 +31,10 @@ test('Exports keep full world bounds and immutable flight metadata with all atte
  const svg=trajectorySVG(map,[trail]);assert.ok(svg.includes('viewBox="0 0 7200 5325"'));assert.ok(svg.includes(map.seed));assert.ok(svg.includes('初速 537'));assert.ok(svg.includes('&quot;initialAngle&quot;:1.2'));assert.ok(svg.includes('M1360.00,2400.00 L5840.00,2400.00'));
  const many=trajectorySVG(map,Array.from({length:20},(_,i)=>({...trail,number:i+1})));assert.equal((many.match(/&quot;initialSpeed&quot;:537/g)||[]).length,20);assert.ok(many.includes('共 20 条轨迹'));
 });
+test('Marker visibility is independent of scoring; butterfly exports always omit markers',()=>{
+ const map=generateMap({seed:createSeed(0,0,'0'.repeat(32))}),stats=createFlightStats(500);stats.time=10;stats.events=[{star:0,degrees:30,x:3000,y:2500,time:2}];
+ const trail={number:1,initialSpeed:500,initialAngle:0,color:'#80c9dc',result:'win',points:[map.spawn,[5840,2400]],stats};
+ assert.ok(trajectorySVG(map,[trail]).includes('data-deflection-marker'));
+ const off=trajectorySVG(map,[trail],{showDeflections:false});assert.equal(off.includes('data-deflection-marker'),false);assert.ok(off.includes('&quot;degrees&quot;:30'));
+ for(const experiment of ['angle','power'])assert.equal(trajectorySVG(map,[{...trail,experiment}],{showDeflections:true}).includes('data-deflection-marker'),false);
+});

@@ -1,7 +1,7 @@
 import {FIELD,WORLD,parseSeed,random} from './orbit-model.js';
 import {deflectionSummary,scoreFlight} from './orbit-score.js';
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),num=n=>Number(n).toFixed(2);
-export function trajectorySVG(map,trails,{zh=true,pixelWidth=1800}={}){
+export function trajectorySVG(map,trails,{zh=true,pixelWidth=1800,showDeflections=true}={}){
  const t=(a,b)=>zh?a:b,footer=400+Math.ceil(Math.min(trails.length,16)/2)*125,height=WORLD.height+footer;
  const text=(x,y,value,size=46,color='#b4c9d9')=>`<text x="${x}" y="${y}" fill="${color}" font-size="${size}" font-family="Arial, sans-serif">${esc(value)}</text>`;
  const circle=(x,y,r,attrs)=>`<circle cx="${num(x)}" cy="${num(y)}" r="${num(r)}" ${attrs}/>`;
@@ -14,7 +14,7 @@ export function trajectorySVG(map,trails,{zh=true,pixelWidth=1800}={}){
  map.stars.forEach((s,i)=>{const hole=s.kind!=='star',white=s.kind==='whitehole',aura=Math.cbrt(s.mass)*(hole?.55:.32);svg+=circle(s.x,s.y,aura,`fill="url(#glow-${i})"`);for(const r of [aura*.55,aura*.9])svg+=circle(s.x,s.y,r,`fill="none" stroke="${white?'#fff2b3':hole?'#b796e1':'#75b6cb'}" stroke-opacity=".4" stroke-width="3"`);if(hole){svg+=`<ellipse cx="${num(s.x)}" cy="${num(s.y)}" rx="22" ry="9" transform="rotate(-26 ${num(s.x)} ${num(s.y)})" fill="none" stroke="${white?'#fff2b3':'#bc9ddd'}" stroke-width="4"/>`+circle(s.x,s.y,s.r,`fill="${white?'#fffbe3':'#030509'}"`);}else svg+=circle(s.x,s.y,s.r,`fill="url(#body-${i})" stroke="#9acadc" stroke-width="2"`);});
  const records=[];
  trails.forEach((trail,i)=>{const summary=deflectionSummary(trail.stats),score=scoreFlight(trail.stats,trail.result),color=trail.baseline?trail.color:trail.result==='win'?'#8de1be':trail.color;svg+=`<path d="${trail.points.map(([x,y],n)=>`${n?'L':'M'}${num(x)},${num(y)}`).join(' ')}" fill="none" stroke="${color}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>`;
-  summary.events.forEach((e,n)=>{svg+=circle(e.x,e.y,22,`fill="#14263a" stroke="${color}" stroke-width="4"`)+text(e.x+30,e.y-20,`${n+1} · ${Math.round(e.degrees)}°`,36,color);});
+  if(showDeflections&&!trail.experiment)summary.events.forEach((e,n)=>{svg+=circle(e.x,e.y,22,`data-deflection-marker="true" fill="#14263a" stroke="${color}" stroke-width="4"`)+text(e.x+30,e.y-20,`${n+1} · ${Math.round(e.degrees)}°`,36,color);});
   const status=t({win:'成功',flying:'飞行中',reset:'已重试',star:'撞星体',whitehole:'碰到白洞',blackhole:'被黑洞捕获',escape:'越界',timeout:'超时'}[trail.result]||'结束',{win:'Captured',flying:'Flying',reset:'Reset',star:'Hit a star',whitehole:'Hit a white hole',blackhole:'Captured by a black hole',escape:'Out of bounds',timeout:'Timed out'}[trail.result]||'Ended');
   records.push({damping:trail.damping||0,baseline:!!trail.baseline,group:trail.group,experiment:trail.experiment,center:trail.center,label:status,number:trail.number,result:trail.result,initialSpeed:trail.initialSpeed,initialAngle:trail.initialAngle,time:trail.stats.time,score,events:summary.events});
  });
@@ -26,8 +26,8 @@ export function trajectorySVG(map,trails,{zh=true,pixelWidth=1800}={}){
  trails.slice(-16).forEach((trail,i)=>{const record=records[records.length-Math.min(trails.length,16)+i],color=trail.baseline?trail.color:trail.result==='win'?'#8de1be':trail.color,x=100+(i%2)*3500,y=WORLD.height+290+Math.floor(i/2)*125;svg+=text(x,y,`#${trail.number}${trail.baseline?t(' · 中心',' · Centre'):''} · ${record.score.total} ${t('分','pts')} · ${record.label}`,44,color)+text(x,y+58,t(`阻尼 ${((record.damping||0)*100).toFixed(2)}%/s · 方向 ${record.initialAngle.toFixed(1)}° · 初速 ${record.initialSpeed} · ${record.time.toFixed(2)} 秒 · ${record.score.count} 次偏转 / ${record.score.degrees.toFixed(1)}°`,`Drag ${((record.damping||0)*100).toFixed(2)}%/s · angle ${record.initialAngle.toFixed(1)}° · speed ${record.initialSpeed} · ${record.time.toFixed(2)} s · ${record.score.count} deflections / ${record.score.degrees.toFixed(1)}°`),36);});
  return svg+`<metadata>${esc(JSON.stringify({seed:map.seed,scoreVersion:1,flights:records}))}</metadata></svg>`;
 }
-export async function downloadTrajectory(map,trails,{format='svg',zh=true,choice='latest'}={}){
- const svg=trajectorySVG(map,trails,{zh,pixelWidth:format==='png'?3600:1800});let blob=new Blob([svg],{type:'image/svg+xml;charset=utf-8'});
+export async function downloadTrajectory(map,trails,{format='svg',zh=true,choice='latest',showDeflections=true}={}){
+ const svg=trajectorySVG(map,trails,{zh,showDeflections,pixelWidth:format==='png'?3600:1800});let blob=new Blob([svg],{type:'image/svg+xml;charset=utf-8'});
  if(format==='png'){const url=URL.createObjectURL(blob);try{const image=new Image();await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=reject;image.src=url;});const c=document.createElement('canvas');c.width=image.naturalWidth;c.height=image.naturalHeight;c.getContext('2d').drawImage(image,0,0);blob=await new Promise((resolve,reject)=>c.toBlob(b=>b?resolve(b):reject(Error('PNG export failed')),'image/png'));}finally{URL.revokeObjectURL(url);}}
  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`orbit-${map.seed.startsWith('C1-')?'C1-'+parseSeed(map.seed).words[0].toString(16):map.seed}-${choice}.${format}`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500);
 }
